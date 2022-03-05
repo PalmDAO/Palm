@@ -6,17 +6,28 @@ import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 
 contract Palm is ERC20, ERC20Permit, ERC20Votes {
-    constructor() ERC20("Palm", "PLM") ERC20Permit("Palm") {}
-
-    function _mint(address to, uint256 amount) internal override(ERC20, ERC20Votes) {
-        super._mint(to, amount);
+    constructor(uint256 initialSupply) ERC20("Palm", "PLM") ERC20Permit("Palm") {
+        super._mint(msg.sender, initialSupply);
     }
 
-    function _afterTokenTransfer(address from, address to, uint256 amount) internal override(ERC20, ERC20Votes) {
+    function _afterTokenTransfer(address from, address to, uint256 amount) 
+        internal 
+        override(ERC20, ERC20Votes) 
+    {
         super._afterTokenTransfer(from, to, amount);
     }
 
-    function _burn(address account, uint256 amount) internal override(ERC20, ERC20Votes) {
+    function _mint(address to, uint256 amount) 
+        internal 
+        override(ERC20, ERC20Votes)
+    {
+        super._mint(to, amount);
+    }
+
+    function _burn(address account, uint256 amount) 
+        internal
+        override(ERC20, ERC20Votes)
+    {
         super._burn(account, amount);
     }
 }
