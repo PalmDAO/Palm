@@ -9,7 +9,21 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFractio
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 
 /// Governor that takes 1 vote per palm holder
-contract PeoplesGovernor is Governor, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction{
+contract PeoplesGovernor is Governor, GovernorVotes, GovernorVotesQuorumFraction{
+    struct ProposalVote {
+        uint256 againstVotes;
+        uint256 forVotes;
+        uint256 abstainVotes;
+        mapping(address => bool) hasVoted;
+    }
+
+    mapping(uint256 => ProposalVote) private _proposalVotes;
+    enum VoteType {
+        Against,
+        For,
+        Abstain
+    }
+
     constructor(IVotes _token)
         Governor("PeopleGovernor")
         GovernorVotes(_token)
@@ -28,11 +42,48 @@ contract PeoplesGovernor is Governor, GovernorCountingSimple, GovernorVotes, Gov
         return 0;
     }
 
-    function getVotes(address account, uint256 blockNumber) public view override(IGovernor, GovernorVotes) returns (uint256) {
-        if (super.getVotes(account, blockNumber) > 0) {
-            return 1;
-        }
-        return 0;
+    function hasVoted(uint256 proposalId, address account) public view virtual override returns (bool) {
+        return _proposalVotes[proposalId].hasVoted[account];
     }
 
+    function COUNTING_MODE() public pure virtual override returns (string memory) {
+        return "support=bravo&wuorum=for,abstain";
+    }
+
+    function _countVote(
+        uint256 proposalId,
+        address account,
+        uint8 support,
+        uint256 weight
+    ) internal override {
+        ProposalVote storage proposalVote = _proposalVotes[proposalId];
+
+        require(!proposalVote.hasVoted[account], "PeoplesGovernor: vote already cast");
+        proposalVote.hasVoted[account] = true;
+
+        if (support == uint8(VoteType.Against)) {
+            proposalVote.againstVotes++;
+        }
+        else if (support == uint8(VoteType.For)) {
+            proposalVote.forVotes++;
+        }
+        else if (support == uint8(VoteType.Abstain)) {
+            proposalVote.abstainVotes++;
+        }
+        else {
+            revert("PeoplesGovernor: invalid value for enum VoteType");
+        }
+    }
+
+    function _quorumReached(uint256 proposalId) internal view virtual override returns (bool) {
+        ProposalVote storage proposalVote = _proposalVotes[proposalId];
+
+        return quorum(proposalSnapshot(proposalId)) <= proposalVote.forVotes + proposalVote.abstainVotes;
+    }
+
+    function _voteSucceeded(uint256 proposalId) internal view virtual override returns (bool) {
+        ProposalVote storage proposalVote = _proposalVotes[proposalId];
+
+        return proposalVote.forVotes > proposalVote.againstVotes;
+    }
 }
