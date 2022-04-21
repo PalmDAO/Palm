@@ -8,8 +8,14 @@ import "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 
+interface IERC20 {
+    function balanceOf(address) external view returns (uint256);
+}
+
 /// Governor that takes 1 vote per palm holder
-contract PeoplesGovernor is Governor, GovernorVotes, GovernorVotesQuorumFraction{
+contract PalmGovernor is Governor, GovernorVotes, GovernorVotesQuorumFraction{
+    address palmAddress = 0x1A4D7378f1eCe02e76bbCFB0a8f4A9d8F607a819;
+
     struct ProposalVote {
         uint256 againstVotes;
         uint256 forVotes;
@@ -25,7 +31,7 @@ contract PeoplesGovernor is Governor, GovernorVotes, GovernorVotesQuorumFraction
     }
 
     constructor(IVotes _token)
-        Governor("PeopleGovernor")
+        Governor("PalmGovernor")
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(4)
     {}
@@ -57,21 +63,34 @@ contract PeoplesGovernor is Governor, GovernorVotes, GovernorVotesQuorumFraction
         uint256 weight
     ) internal override {
         ProposalVote storage proposalVote = _proposalVotes[proposalId];
+        require(!proposalVote.hasVoted[account], "PalmGovernor: vote already cast");
 
-        require(!proposalVote.hasVoted[account], "PeoplesGovernor: vote already cast");
         proposalVote.hasVoted[account] = true;
 
+        uint256 balance = IERC20(palmAddress).balanceOf(msg.sender);
+        uint256 totalVotingPower = 0;
+
+        // Calculating peoples branch power
+        if (balance >= 1000) {
+            totalVotingPower += 1;
+        }
+
+        // Calculating whales branch power
+        if (balance >= 1) {
+            totalVotingPower += balance;
+        }
+
         if (support == uint8(VoteType.Against)) {
-            proposalVote.againstVotes++;
+            proposalVote.againstVotes += totalVotingPower;
         }
         else if (support == uint8(VoteType.For)) {
-            proposalVote.forVotes++;
+            proposalVote.forVotes += totalVotingPower;
         }
         else if (support == uint8(VoteType.Abstain)) {
-            proposalVote.abstainVotes++;
+            proposalVote.abstainVotes += totalVotingPower;
         }
         else {
-            revert("PeoplesGovernor: invalid value for enum VoteType");
+            revert("PalmGovernor: invalid value for enum VoteType");
         }
     }
 
@@ -83,7 +102,6 @@ contract PeoplesGovernor is Governor, GovernorVotes, GovernorVotesQuorumFraction
 
     function _voteSucceeded(uint256 proposalId) internal view virtual override returns (bool) {
         ProposalVote storage proposalVote = _proposalVotes[proposalId];
-
         return proposalVote.forVotes > proposalVote.againstVotes;
     }
 }
